@@ -3,6 +3,7 @@ from collections import Counter
 import functools
 import math
 import operator
+from decimal import Decimal
 
 
 class NaiveBayes:
@@ -91,7 +92,7 @@ class NaiveBayes:
                                  for label, num_data_points in num_per_label.items()}
         return self
 
-    def test_value(self, word_list):
+    def test_value(self, word_list, expected_value):
         prob_given_class = {class_label: [] for class_label, class_dict in self.labels.items()}
         for word in word_list:
             if word in self.vocab:
@@ -101,14 +102,17 @@ class NaiveBayes:
         results = {class_label: (math.log(self.class_proportion[class_label], self.log_base) +
                                  sum([math.log(value, self.log_base) for value in prob_values]))
                    for class_label, prob_values in prob_given_class.items()}
-        evaluated_output = max(results.items(), key=operator.itemgetter(1))[0]
-        return evaluated_output
+        evaluated_output = max(results.items(), key=operator.itemgetter(1))
+        value = '%.2E' % Decimal(evaluated_output[1])
+        predicted_class = evaluated_output[0]
+        return {'predicted_output': predicted_class, 'predicted_value': value,
+                'is_correct': 'correct' if predicted_class == expected_value else 'wrong'}
 
     def test(self, test_df, data_label, class_label, id_label):
         if self.smoothing == 0.0 or self.log_base == 0.0:
             raise Exception(f'Smoothing ({self.smoothing}) or Log base ({self.log_base}) cannot be 0')
 
-        results = [{'actual_output': self.test_value(row[data_label].lower().split(' ')),
+        results = [{'output': self.test_value(row[data_label].lower().split(' '), row[class_label]),
                     'expected_output': row[class_label],
                     'id': row[id_label]}
                    for _, row in test_df.iterrows()]
@@ -119,5 +123,9 @@ if __name__ == '__main__':
     data = pd.read_table('covid_training.tsv')
     NB = NaiveBayes(0.01, 10).train(data, 'text', 'q1_label', True).fit_params()
     test_data = pd.read_table('covid_test_public.tsv')
-    result = NB.test(test_data, 1, 2)
+    result = NB.test(test_data, 1, 2, 0)
+    with open('result.txt', 'a') as f:
+        for res in result:
+            f.write(f'{res["id"]}  {res["output"]["predicted_output"]}  {res["output"]["predicted_value"]}  '
+                    f'{res["expected_output"]}  {res["output"]["is_correct"]}\n')
 
