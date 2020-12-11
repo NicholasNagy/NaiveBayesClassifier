@@ -104,12 +104,13 @@ class NaiveBayes:
         evaluated_output = max(results.items(), key=operator.itemgetter(1))[0]
         return evaluated_output
 
-    def test(self, test_df, data_label, class_label):
+    def test(self, test_df, data_label, class_label, id_label):
         if self.smoothing == 0.0 or self.log_base == 0.0:
             raise Exception(f'Smoothing ({self.smoothing}) or Log base ({self.log_base}) cannot be 0')
 
         results = [{'actual_output': self.test_value(row[data_label].lower().split(' ')),
-                    'expected_output': row[class_label]}
+                    'expected_output': row[class_label],
+                    'id': row[id_label]}
                    for _, row in test_df.iterrows()]
         return results
 
