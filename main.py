@@ -87,8 +87,8 @@ class NaiveBayes:
         self.labels, self.vocab = labels, the_vocab
         self.num_words_in_labels = {class_label: sum(class_dict.values()) for class_label, class_dict in labels.items()}
 
-        tot_data_points = functools.reduce(lambda x, y: x+y, num_per_label.values())
-        self.class_proportion = {label: num_data_points/tot_data_points
+        tot_data_points = functools.reduce(lambda x, y: x + y, num_per_label.values())
+        self.class_proportion = {label: num_data_points / tot_data_points
                                  for label, num_data_points in num_per_label.items()}
         return self
 
@@ -97,7 +97,7 @@ class NaiveBayes:
         for word in word_list:
             if word in self.vocab:
                 for class_label, class_dict in self.labels.items():
-                    prob_given_class[class_label].append(class_dict[word]/self.num_words_in_labels[class_label])
+                    prob_given_class[class_label].append(class_dict[word] / self.num_words_in_labels[class_label])
 
         results = {class_label: (math.log(self.class_proportion[class_label], self.log_base) +
                                  sum([math.log(value, self.log_base) for value in prob_values]))
@@ -121,30 +121,37 @@ class NaiveBayes:
 
 class Stats:
 
-    @classmethod
-    def accuracy(cls, results):
-        return sum([1 if val["output"]["is_correct"] == 'correct' else 0 for val in results]) / len(results)
+    def __init__(self, results):
+        self.results = results
+        self.acc = self.accuracy()
+        self.rec = self.recall()
+        self.prec = self.precision()
 
-    @classmethod
-    def recall(cls, results):
-        labels = dict()
-        for res in results:
-            if not res["expected_output"] in labels:
-                labels[res["expected_output"]] = {"tp": 0, "tp+fn": 0}
-            labels[res["expected_output"]]["tp+fn"] += 1
-            if res["output"]["is_correct"] == 'correct':
-                labels[res["expected_output"]] += 1
-        return labels
+    def accuracy(self):
+        return sum([1 if val["output"]["is_correct"] == 'correct' else 0 for val in self.results]) / len(self.results)
 
-    @classmethod
-    def precision(cls, results):
+    def recall(self):
         labels = dict()
-        for res in results:
-            if not res["output"]["predicted_output"] in labels:
-                labels[res["output"]["predicted_output"]] = {"tp": 0, "tp+fp": 0}
-            if res["output"]["is_correct"] == 'correct':
-                labels[res["output"]["predicted_output"]]["tp"] += 1
-            labels[res["output"]["predicted_output"]]["tp+fp"] += 1
+        for out in self.results:
+            if not out["expected_output"] in labels:
+                labels[out["expected_output"]] = {"tp": 0, "tp+fn": 0}
+            labels[out["expected_output"]]["tp+fn"] += 1
+            if out["output"]["is_correct"] == 'correct':
+                labels[out["expected_output"]]["tp"] += 1
+        return [label["tp"] / label["tp+fn"] for label in labels]
+
+    def precision(self):
+        labels = dict()
+        for out in self.results:
+            if not out["output"]["predicted_output"] in labels:
+                labels[out["output"]["predicted_output"]] = {"tp": 0, "tp+fp": 0}
+            if out["output"]["is_correct"] == 'correct':
+                labels[out["output"]["predicted_output"]]["tp"] += 1
+            labels[out["output"]["predicted_output"]]["tp+fp"] += 1
+        return [label["tp"] / label["tp+fp"] for label in labels]
+
+    def write_results(self):
+        pass
 
 
 if __name__ == '__main__':
@@ -156,4 +163,3 @@ if __name__ == '__main__':
         for res in result:
             f.write(f'{res["id"]}  {res["output"]["predicted_output"]}  {res["output"]["predicted_value"]}  '
                     f'{res["expected_output"]}  {res["output"]["is_correct"]}\n')
-
