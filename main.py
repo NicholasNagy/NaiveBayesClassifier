@@ -119,6 +119,34 @@ class NaiveBayes:
         return results
 
 
+class Stats:
+
+    @classmethod
+    def accuracy(cls, results):
+        return sum([1 if val["output"]["is_correct"] == 'correct' else 0 for val in results]) / len(results)
+
+    @classmethod
+    def recall(cls, results):
+        labels = dict()
+        for res in results:
+            if not res["expected_output"] in labels:
+                labels[res["expected_output"]] = {"tp": 0, "tp+fn": 0}
+            labels[res["expected_output"]]["tp+fn"] += 1
+            if res["output"]["is_correct"] == 'correct':
+                labels[res["expected_output"]] += 1
+        return labels
+
+    @classmethod
+    def precision(cls, results):
+        labels = dict()
+        for res in results:
+            if not res["output"]["predicted_output"] in labels:
+                labels[res["output"]["predicted_output"]] = {"tp": 0, "tp+fp": 0}
+            if res["output"]["is_correct"] == 'correct':
+                labels[res["output"]["predicted_output"]]["tp"] += 1
+            labels[res["output"]["predicted_output"]]["tp+fp"] += 1
+
+
 if __name__ == '__main__':
     data = pd.read_table('covid_training.tsv')
     NB = NaiveBayes(0.01, 10).train(data, 'text', 'q1_label', True).fit_params()
