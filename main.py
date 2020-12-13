@@ -126,6 +126,8 @@ class Stats:
         self.acc = self.accuracy()
         self.rec = self.recall()
         self.prec = self.precision()
+        self.f1 = {label: (2*prec*self.rec[label])/(prec + self.rec[label])
+                   for label, prec in self.prec.items()}
 
     def accuracy(self):
         return sum([1 if val["output"]["is_correct"] == 'correct' else 0 for val in self.results]) / len(self.results)
@@ -138,7 +140,7 @@ class Stats:
             labels[out["expected_output"]]["tp+fn"] += 1
             if out["output"]["is_correct"] == 'correct':
                 labels[out["expected_output"]]["tp"] += 1
-        return [label["tp"] / label["tp+fn"] for label in labels]
+        return {label: the_result["tp"] / the_result["tp+fn"] for label, the_result in labels.items()}
 
     def precision(self):
         labels = dict()
@@ -148,18 +150,34 @@ class Stats:
             if out["output"]["is_correct"] == 'correct':
                 labels[out["output"]["predicted_output"]]["tp"] += 1
             labels[out["output"]["predicted_output"]]["tp+fp"] += 1
-        return [label["tp"] / label["tp+fp"] for label in labels]
+        return {label: the_result["tp"] / the_result["tp+fp"] for label, the_result in labels.items()}
 
-    def write_results(self):
-        pass
+    def write_results(self, file_to_write):
+        with open(file_to_write, 'w') as the_file:
+            the_file.write(f'{self.acc}\n')
+            the_file.write(f'{self.prec["yes"]}  {self.prec["no"]}\n')
+            the_file.write(f'{self.rec["yes"]}  {self.rec["no"]}\n')
+            the_file.write(f'{self.f1["yes"]}  {self.f1["no"]}\n')
+
+
+def write_results(results, file_to_write):
+    with open(file_to_write, 'w') as f:
+        for res in results:
+            f.write(f'{res["id"]}  {res["output"]["predicted_output"]}  {res["output"]["predicted_value"]}  '
+                    f'{res["expected_output"]}  {res["output"]["is_correct"]}\n')
 
 
 if __name__ == '__main__':
     data = pd.read_table('covid_training.tsv')
-    NB = NaiveBayes(0.01, 10).train(data, 'text', 'q1_label', True).fit_params()
     test_data = pd.read_table('covid_test_public.tsv')
+    NB = NaiveBayes(0.01, 10).train(data, 'text', 'q1_label', False).fit_params()
     result = NB.test(test_data, 1, 2, 0)
-    with open('result.txt', 'a') as f:
-        for res in result:
-            f.write(f'{res["id"]}  {res["output"]["predicted_output"]}  {res["output"]["predicted_value"]}  '
-                    f'{res["expected_output"]}  {res["output"]["is_correct"]}\n')
+    write_results(result, "trace_NB-BOW-OV.txt")
+    stat = Stats(result)
+    stat.write_results("eval_NB-BOW-OV.txt")
+
+    NB_filtered = NaiveBayes(0.01, 10).train(data, 'text', 'q1_label', True).fit_params()
+    result_filter = NB_filtered.test(test_data, 1, 2, 0)
+    write_results(result_filter, "trace_NB-BOW-FV.txt")
+    stat = Stats(result_filter)
+    stat.write_results("eval_NB-BOW-FV.txt")
