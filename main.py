@@ -19,6 +19,7 @@ class NaiveBayes:
 
     @classmethod
     def merge_dict(cls, from_merge, to_merge):
+        # merges one dictionaries frequencies per word to the other and returns it
         for k, v in from_merge.items():
             if k in to_merge:
                 to_merge[k] += v
@@ -28,12 +29,14 @@ class NaiveBayes:
 
     @classmethod
     def filter_dict(cls, count_dict):
+        # removes the words for each labels' word to dictionary that have a count of only 1
         l_to_del = [word for word, the_count in count_dict.items() if the_count == 1]
         for word in l_to_del:
             del count_dict[word]
         return count_dict
 
     def __smooth(self):
+        # smoothes out the frequencies for all the items in the vocabularies by adding 0.01
         for word, frequency in self.vocab.items():
             for class_label, class_dict in self.labels.items():
                 if word in class_dict:
@@ -41,7 +44,12 @@ class NaiveBayes:
                 else:
                     class_dict[word] = self.smoothing
 
+        # Adjust the # of words in each class (necessary after smoothing)
+        self.num_words_in_labels = {label: sum([freq for word, freq in class_dict.items()])
+                                    for label, class_dict in self.labels.items()}
+
     def fit_params(self, smoothing=None, log_base=None):
+        # checks to make sure that the parameters are appropriately set to allow it to properly tested
         if self.fitted:
             print("Overriding previous fit")
         if smoothing is not None:
@@ -53,20 +61,19 @@ class NaiveBayes:
             raise Exception(f'Smoothing ({smoothing}) or Log base ({log_base}) cannot be 0')
         self.__smooth()
 
-        # for class_label, class_dict in self.labels.items():
-        #     if len(class_dict) == len(self.vocab):
-        #         print("ok")
-        #     else:
-        #         print("not ok")
+        self.fitted = True
 
         return self
 
     def train(self, the_df, data_label, class_label, do_filter=False):
+        # training that takes all the data and creates a dictionary where each key is a word, and each value is the
+        # frequency of that word. This is held in the labels dict, which is a dictionary whose key is the label for
+        # the dictionary it holds
         labels = dict()
         num_per_label = dict()
         for index, row in the_df.iterrows():
             # counts occurences of every word (obtained by splitting on ' ')
-            word_dict = Counter(row[data_label].lower().split(' '))
+            word_dict = Counter(filter(None, row[data_label].lower().split(' ')))
 
             data_point_label = row[class_label]
             if not (data_point_label in labels):
@@ -81,9 +88,7 @@ class NaiveBayes:
         # functionality
         the_vocab = functools.reduce(lambda l1, l2: self.merge_dict(l1[1], self.merge_dict(l2[1], dict())),
                                      labels.items())
-        # for k, v in labels.items():
-        #     print(f'{k}: {sum(v.values())}')
-        # print(f'Num words in Vocab: {len(the_vocab)} Count of Words: {sum(the_vocab.values())}')
+
         self.labels, self.vocab = labels, the_vocab
         self.num_words_in_labels = {class_label: sum(class_dict.values()) for class_label, class_dict in labels.items()}
 
@@ -109,8 +114,11 @@ class NaiveBayes:
                 'is_correct': 'correct' if predicted_class == expected_value else 'wrong'}
 
     def test(self, test_df, data_label, class_label, id_label):
+        # tests the model on each value, fails if required previous steps weren't completed
         if self.smoothing == 0.0 or self.log_base == 0.0:
             raise Exception(f'Smoothing ({self.smoothing}) or Log base ({self.log_base}) cannot be 0')
+        if not self.fitted:
+            raise Exception("Classifier needs to be fitted before testing")
 
         results = [{'output': self.test_value(row[data_label].lower().split(' '), row[class_label]),
                     'expected_output': row[class_label],
